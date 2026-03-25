@@ -1,9 +1,12 @@
-<template>
+﻿<template>
   <section class="rounded-3xl border border-slate-800 bg-slate-900/60 p-8 text-slate-100">
     <div class="flex flex-wrap items-end justify-between gap-4">
       <div>
         <p class="text-xs uppercase tracking-[0.22em] text-slate-400">MJSIR</p>
         <h1 class="text-2xl font-semibold uppercase tracking-[0.12em]">MJSIR Acknowledgement</h1>
+        <p class="mt-2 max-w-2xl text-xs text-slate-400">
+          Track distributed journal copies, recipients, and issuance details in one printable log.
+        </p>
       </div>
       <div class="flex flex-wrap items-center gap-2">
         <input
@@ -13,6 +16,7 @@
           class="w-64 rounded-full border border-slate-700 bg-slate-950/70 px-4 py-2 text-xs text-slate-100 placeholder:text-slate-500 focus:border-emerald-400 focus:outline-none"
         />
         <button
+          v-if="isAuthenticated"
           type="button"
           class="rounded-full border border-emerald-500/60 bg-emerald-500/10 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-emerald-200 transition hover:border-emerald-400 hover:text-emerald-100"
           @click="openModal"
@@ -26,10 +30,10 @@
     <p v-if="pageError" class="mt-4 text-xs text-rose-300">{{ pageError }}</p>
 
     <div class="mt-6 overflow-hidden rounded-2xl border border-slate-800">
-      <div v-if="loading" class="px-4 py-6 text-sm text-slate-300">Loading distributed journals...</div>
+      <div v-if="loading" class="px-4 py-6 text-sm text-slate-300">Loading acknowledgement records...</div>
       <div v-else-if="error" class="px-4 py-6 text-sm text-rose-300">{{ error }}</div>
       <div v-else-if="filteredRows.length === 0" class="px-4 py-6 text-sm text-slate-300">
-        No distributed journals found.
+        No acknowledgement records found.
       </div>
 
       <div v-else class="overflow-x-auto">
@@ -44,21 +48,22 @@
               <th class="px-4 py-3 font-semibold">Volume</th>
               <th class="px-4 py-3 font-semibold">No. of Copies</th>
               <th class="px-4 py-3 font-semibold">Remarks</th>
-              <th class="px-4 py-3 font-semibold">Action</th>
+              <th v-if="isAuthenticated" class="px-4 py-3 font-semibold">Action</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-slate-800 text-slate-200">
             <tr v-for="row in filteredRows" :key="row.groupKey">
-              <td class="px-4 py-3">{{ formatDate(row.date_distributed) }}</td>
-              <td class="px-4 py-3">{{ formatTime(row.distributed_time) }}</td>
-              <td class="px-4 py-3">{{ row.recipient_name || '-' }}</td>
+              <td class="px-4 py-3">{{ formatDate(row.date_issued) }}</td>
+              <td class="px-4 py-3">{{ formatTime(row.time_issued) }}</td>
+              <td class="px-4 py-3">{{ row.name || '-' }}</td>
               <td class="px-4 py-3">{{ row.position || '-' }}</td>
-              <td class="px-4 py-3">{{ row.affiliation_agency || '-' }}</td>
+              <td class="px-4 py-3">{{ row.affiliation || '-' }}</td>
               <td class="px-4 py-3">{{ row.itemsLabel || '-' }}</td>
               <td class="px-4 py-3">{{ row.copiesLabel || '-' }}</td>
               <td class="px-4 py-3">{{ row.remarksLabel || '-' }}</td>
-              <td class="px-4 py-3">
+              <td v-if="isAuthenticated" class="px-4 py-3">
                 <button
+                  v-if="isAuthenticated"
                   type="button"
                   class="mr-2 rounded border border-emerald-500/70 bg-emerald-500/10 px-2 py-1 text-[10px] uppercase tracking-[0.14em] text-emerald-200 hover:border-emerald-400"
                   @click="printRecord(row)"
@@ -66,6 +71,7 @@
                   Print
                 </button>
                 <button
+                  v-if="isAuthenticated"
                   type="button"
                   class="rounded border border-sky-500/70 bg-sky-500/10 px-2 py-1 text-[10px] uppercase tracking-[0.14em] text-sky-200 hover:border-sky-400"
                   @click="openAddVolumeModal(row)"
@@ -73,6 +79,7 @@
                   Edit
                 </button>
                 <button
+                  v-if="isAuthenticated"
                   type="button"
                   class="ml-2 rounded border border-rose-500/70 bg-rose-500/10 px-2 py-1 text-[10px] uppercase tracking-[0.14em] text-rose-200 hover:border-rose-400"
                   @click="deleteRecord(row)"
@@ -89,16 +96,16 @@
 
   <transition name="fade">
     <div
-      v-if="showModal"
+      v-if="showModal && isAuthenticated"
       class="fixed inset-0 z-40 bg-black/60"
       @click="closeModal"
     ></div>
   </transition>
 
   <transition name="modal">
-    <div v-if="showModal" class="fixed inset-0 z-50 grid place-items-center p-4">
+    <div v-if="showModal && isAuthenticated" class="fixed inset-0 z-50 grid place-items-center p-4">
       <div class="w-full max-w-3xl rounded-2xl border border-slate-800 bg-slate-900 p-5 shadow-2xl" @click.stop>
-        <div class="mb-4 flex items-center justify-between">
+        <div class="mb-6 flex items-center justify-between">
           <h2 class="text-sm font-semibold uppercase tracking-[0.2em] text-slate-200">Add Distributed Journal</h2>
           <button
             type="button"
@@ -122,6 +129,31 @@
                 @click="openDateTimePicker"
               />
             </label>
+
+            <div class="mt-3 grid gap-3 md:grid-cols-2">
+              <label class="text-sm">
+                <span class="mb-1 block text-xs uppercase tracking-[0.18em] text-slate-400">Type Date (YYYY-MM-DD)</span>
+                <input
+                  v-model.trim="form.date_issued"
+                  type="text"
+                  inputmode="numeric"
+                  maxlength="10"
+                  placeholder="YYYY-MM-DD"
+                  class="w-full rounded-lg border border-slate-700 bg-slate-950/80 px-3 py-2 text-sm text-slate-100 focus:border-emerald-400 focus:outline-none"
+                />
+              </label>
+              <label class="text-sm">
+                <span class="mb-1 block text-xs uppercase tracking-[0.18em] text-slate-400">Type Time (HH:MM)</span>
+                <input
+                  v-model.trim="form.time_issued"
+                  type="text"
+                  inputmode="numeric"
+                  maxlength="5"
+                  placeholder="HH:MM"
+                  class="w-full rounded-lg border border-slate-700 bg-slate-950/80 px-3 py-2 text-sm text-slate-100 focus:border-emerald-400 focus:outline-none"
+                />
+              </label>
+            </div>
 
             <div v-if="pickerOpen" class="absolute left-4 right-4 top-24 z-20 rounded-xl border border-slate-700 bg-slate-900 p-4 shadow-2xl">
               <div class="grid gap-4 md:grid-cols-[1fr_220px]">
@@ -219,7 +251,7 @@
             <span class="mb-1 block text-xs uppercase tracking-[0.18em] text-slate-400">Name *</span>
             <input
               ref="journalTitleInput"
-              v-model.trim="form.recipient_name"
+              v-model.trim="form.name"
               type="text"
               required
               class="w-full rounded-lg border border-slate-700 bg-slate-950/70 px-3 py-2 text-sm text-slate-100 focus:border-emerald-400 focus:outline-none"
@@ -239,43 +271,59 @@
           <label class="text-sm">
             <span class="mb-1 block text-xs uppercase tracking-[0.18em] text-slate-400">Affiliation/Agency *</span>
             <input
-              v-model.trim="form.affiliation_agency"
+              v-model.trim="form.affiliation"
               type="text"
               required
               class="w-full rounded-lg border border-slate-700 bg-slate-950/70 px-3 py-2 text-sm text-slate-100 focus:border-emerald-400 focus:outline-none"
             />
           </label>
 
-          <label class="text-sm">
-            <span class="mb-1 block text-xs uppercase tracking-[0.18em] text-slate-400">Volume *</span>
-            <input
-              v-model.trim="form.volume"
-              type="text"
-              required
-              class="w-full rounded-lg border border-slate-700 bg-slate-950/70 px-3 py-2 text-sm text-slate-100 focus:border-emerald-400 focus:outline-none"
-            />
-          </label>
+          <div class="md:col-span-2 rounded-xl border border-slate-800 bg-slate-950/60 p-3">
+            <div class="mb-2 flex items-center justify-between">
+              <p class="text-xs uppercase tracking-[0.16em] text-slate-400">Items</p>
+              <button
+                type="button"
+                class="rounded border border-sky-500/70 bg-sky-500/10 px-2 py-1 text-[10px] uppercase tracking-[0.14em] text-sky-200 hover:border-sky-400"
+                @click="addFormItem"
+              >
+                Add Item
+              </button>
+            </div>
 
-          <label class="text-sm">
-            <span class="mb-1 block text-xs uppercase tracking-[0.18em] text-slate-400">No. of Copies *</span>
-            <input
-              v-model.number="form.no_of_copies"
-              type="number"
-              min="1"
-              required
-              class="w-full rounded-lg border border-slate-700 bg-slate-950/70 px-3 py-2 text-sm text-slate-100 focus:border-emerald-400 focus:outline-none"
-            />
-          </label>
-
-          <label class="text-sm md:col-span-2">
-            <span class="mb-1 block text-xs uppercase tracking-[0.18em] text-slate-400">Remarks *</span>
-            <textarea
-              v-model.trim="form.remarks"
-              rows="3"
-              required
-              class="w-full rounded-lg border border-slate-700 bg-slate-950/70 px-3 py-2 text-sm text-slate-100 focus:border-emerald-400 focus:outline-none"
-            ></textarea>
-          </label>
+            <div
+              v-for="(item, index) in form.items"
+              :key="`form-item-${index}`"
+              class="mb-2 grid items-center gap-2 md:grid-cols-[minmax(0,1fr)_96px_minmax(0,1fr)_84px]"
+            >
+              <input
+                v-model.trim="item.volume"
+                type="text"
+                placeholder="Volume"
+                required
+                class="min-w-0 rounded-lg border border-slate-700 bg-slate-950/70 px-3 py-2 text-sm text-slate-100 focus:border-emerald-400 focus:outline-none"
+              />
+              <input
+                v-model.number="item.copies"
+                type="number"
+                min="1"
+                required
+                class="min-w-0 rounded-lg border border-slate-700 bg-slate-950/70 px-3 py-2 text-sm text-slate-100 focus:border-emerald-400 focus:outline-none"
+              />
+              <input
+                v-model.trim="item.remark"
+                type="text"
+                placeholder="Remark (optional)"
+                class="min-w-0 rounded-lg border border-slate-700 bg-slate-950/70 px-3 py-2 text-sm text-slate-100 focus:border-emerald-400 focus:outline-none"
+              />
+              <button
+                type="button"
+                class="w-full rounded border border-rose-500/60 px-2 py-1 text-[10px] uppercase tracking-[0.14em] text-rose-300 hover:border-rose-400"
+                @click="removeFormItem(index)"
+              >
+                Remove
+              </button>
+            </div>
+          </div>
 
           <label class="text-sm">
             <span class="mb-1 block text-xs uppercase tracking-[0.18em] text-slate-400">Issued By *</span>
@@ -315,14 +363,14 @@
 
   <transition name="fade">
     <div
-      v-if="showAddVolumeModal"
+      v-if="showAddVolumeModal && isAuthenticated"
       class="fixed inset-0 z-[60] bg-black/60"
       @click="closeAddVolumeModal"
     ></div>
   </transition>
 
   <transition name="modal">
-    <div v-if="showAddVolumeModal" class="fixed inset-0 z-[70] grid place-items-center p-4">
+    <div v-if="showAddVolumeModal && isAuthenticated" class="fixed inset-0 z-[70] grid place-items-center p-4">
       <div class="w-full max-w-3xl rounded-2xl border border-slate-800 bg-slate-900 p-5 shadow-2xl" @click.stop>
         <div class="mb-4 flex items-center justify-between">
           <h3 class="text-sm font-semibold uppercase tracking-[0.2em] text-slate-100">Edit Record</h3>
@@ -339,18 +387,17 @@
           <label class="text-sm">
             <span class="mb-1 block text-xs uppercase tracking-[0.16em] text-slate-400">Date *</span>
             <input
-              v-model="editForm.date_distributed"
+              v-model="editForm.date_issued"
               type="date"
               required
               class="w-full rounded-lg border border-slate-700 bg-slate-950/70 px-3 py-2 text-sm text-slate-100 focus:border-emerald-400 focus:outline-none"
             />
           </label>
           <label class="text-sm">
-            <span class="mb-1 block text-xs uppercase tracking-[0.16em] text-slate-400">Time *</span>
+            <span class="mb-1 block text-xs uppercase tracking-[0.16em] text-slate-400">Time (optional)</span>
             <input
-              v-model="editForm.distributed_time"
+              v-model="editForm.time_issued"
               type="time"
-              required
               class="w-full rounded-lg border border-slate-700 bg-slate-950/70 px-3 py-2 text-sm text-slate-100 focus:border-emerald-400 focus:outline-none"
             />
           </label>
@@ -358,7 +405,7 @@
           <label class="text-sm">
             <span class="mb-1 block text-xs uppercase tracking-[0.16em] text-slate-400">Name</span>
             <input
-              v-model.trim="editForm.recipient_name"
+              v-model.trim="editForm.name"
               type="text"
               class="w-full rounded-lg border border-slate-700 bg-slate-950/70 px-3 py-2 text-sm text-slate-100 focus:border-emerald-400 focus:outline-none"
             />
@@ -375,7 +422,7 @@
           <label class="text-sm">
             <span class="mb-1 block text-xs uppercase tracking-[0.16em] text-slate-400">Affiliation/Agency</span>
             <input
-              v-model.trim="editForm.affiliation_agency"
+              v-model.trim="editForm.affiliation"
               type="text"
               class="w-full rounded-lg border border-slate-700 bg-slate-950/70 px-3 py-2 text-sm text-slate-100 focus:border-emerald-400 focus:outline-none"
             />
@@ -406,17 +453,16 @@
                 class="min-w-0 rounded-lg border border-slate-700 bg-slate-950/70 px-3 py-2 text-sm text-slate-100 focus:border-emerald-400 focus:outline-none"
               />
               <input
-                v-model.number="item.no_of_copies"
+                v-model.number="item.copies"
                 type="number"
                 min="1"
                 required
                 class="min-w-0 rounded-lg border border-slate-700 bg-slate-950/70 px-3 py-2 text-sm text-slate-100 focus:border-emerald-400 focus:outline-none"
               />
               <input
-                v-model.trim="item.remarks"
+                v-model.trim="item.remark"
                 type="text"
-                placeholder="Remark"
-                required
+                placeholder="Remark (optional)"
                 class="min-w-0 rounded-lg border border-slate-700 bg-slate-950/70 px-3 py-2 text-sm text-slate-100 focus:border-emerald-400 focus:outline-none"
               />
               <button
@@ -476,6 +522,7 @@
 <script setup>
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import axios from 'axios'
+import { useAuth } from '../composables/useAuth'
 
 const loading = ref(false)
 const error = ref('')
@@ -489,32 +536,32 @@ const searchQuery = ref('')
 const showModal = ref(false)
 const journalTitleInput = ref(null)
 const showAddVolumeModal = ref(false)
-const addVolumeSource = ref(null)
-const editSourceItemIds = ref([])
 const editForm = ref({
-  date_distributed: '',
-  distributed_time: '',
-  recipient_name: '',
+  id: null,
+  date_issued: '',
+  time_issued: '',
+  name: '',
   position: '',
-  affiliation_agency: '',
+  affiliation: '',
   issued_by: '',
   received_by: '',
-  items: [{ volume: '', no_of_copies: 1, remarks: '' }]
+  remarks: '',
+  items: [{ volume: '', copies: 1, remark: '' }]
 })
 let previousBodyOverflow = ''
 
 const form = ref({
-  date_distributed: '',
-  distributed_time: '',
-  recipient_name: '',
+  date_issued: '',
+  time_issued: '',
+  name: '',
   position: '',
-  affiliation_agency: '',
+  affiliation: '',
   issued_by: '',
   received_by: '',
-  volume: '',
-  no_of_copies: 1,
-  remarks: ''
+  items: [{ volume: '', copies: 1, remark: '' }]
 })
+
+const { isAuthenticated, checkAuth } = useAuth()
 
 const pickerOpen = ref(false)
 const pickerYear = ref(new Date().getFullYear())
@@ -531,40 +578,10 @@ const meridiemOptions = ['AM', 'PM']
 
 const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:8080/api'
 
-const groupedRows = computed(() => {
-  const groups = new Map()
-
-  for (const row of rows.value) {
-    const groupKey = [
-      row.date_distributed ?? '',
-      row.distributed_time ?? '',
-      row.recipient_name ?? '',
-      row.position ?? '',
-      row.affiliation_agency ?? '',
-      row.issued_by ?? '',
-      row.received_by ?? ''
-    ].join('||')
-
-    if (!groups.has(groupKey)) {
-      groups.set(groupKey, {
-        groupKey,
-        date_distributed: row.date_distributed,
-        distributed_time: row.distributed_time,
-        recipient_name: row.recipient_name,
-        position: row.position,
-        affiliation_agency: row.affiliation_agency,
-        issued_by: row.issued_by,
-        received_by: row.received_by,
-        itemRows: [],
-        primaryRow: row
-      })
-    }
-
-    groups.get(groupKey).itemRows.push(row)
-  }
-
-  return Array.from(groups.values()).map((group) => {
-    const sortedItems = [...group.itemRows].sort((a, b) =>
+const groupedRows = computed(() =>
+  rows.value.map((row) => {
+    const items = Array.isArray(row.items) ? row.items : []
+    const sortedItems = [...items].sort((a, b) =>
       String(a.volume ?? '').localeCompare(String(b.volume ?? ''), undefined, { numeric: true, sensitivity: 'base' })
     )
     const itemsLabel = sortedItems
@@ -572,23 +589,24 @@ const groupedRows = computed(() => {
       .filter(Boolean)
       .join(', ')
     const copiesLabel = sortedItems
-      .map((item) => String(item.no_of_copies ?? '').trim())
+      .map((item) => String(item.copies ?? '').trim())
       .filter(Boolean)
       .join(', ')
     const remarksLabel = sortedItems
-      .map((item) => String(item.remarks ?? '').trim())
+      .map((item) => String(item.remark ?? '').trim())
       .filter(Boolean)
       .join(' | ')
 
     return {
-      ...group,
+      ...row,
+      groupKey: row.id || `${row.date_issued}-${row.time_issued}-${row.name}`,
       itemRows: sortedItems,
       itemsLabel,
       copiesLabel,
       remarksLabel
     }
   })
-})
+)
 
 const filteredRows = computed(() => {
   const q = searchQuery.value.trim().toLowerCase()
@@ -596,16 +614,17 @@ const filteredRows = computed(() => {
 
   return groupedRows.value.filter((row) => {
     const haystack = [
-      formatDate(row.date_distributed),
-      formatTime(row.distributed_time),
-      row.recipient_name,
+      formatDate(row.date_issued),
+      formatTime(row.time_issued),
+      row.name,
       row.position,
-      row.affiliation_agency,
+      row.affiliation,
       row.itemsLabel,
       row.copiesLabel,
       row.remarksLabel,
       row.issued_by,
-      row.received_by
+      row.received_by,
+      row.remarks
     ]
       .map((v) => String(v ?? '').toLowerCase())
       .join(' ')
@@ -636,14 +655,23 @@ const escapeHtml = (value) =>
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;')
 
+const logoUrl = new URL('../assets/logo-bsu.jpg', import.meta.url).href
+
 const printRecord = (row) => {
   const popup = window.open('', '_blank', 'width=900,height=700')
   if (!popup) return
-  const itemRows = Array.isArray(row.itemRows) && row.itemRows.length ? row.itemRows : [row]
-  const printableItemRows = itemRows.slice(0, 6)
-  while (printableItemRows.length < 6) {
-    printableItemRows.push({ volume: '', no_of_copies: '', remarks: '' })
+  const itemRows = Array.isArray(row.itemRows) ? row.itemRows : []
+  const printableItemRows = itemRows.slice(0, 7)
+  while (printableItemRows.length < 7) {
+    printableItemRows.push({ volume: '', copies: '', remark: '' })
   }
+  const printedAt = new Date().toLocaleString([], {
+    year: '2-digit',
+    month: 'numeric',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit'
+  })
 
   const html = `
     <!doctype html>
@@ -652,38 +680,100 @@ const printRecord = (row) => {
         <meta charset="utf-8" />
         <title>MJSIR Acknowledgement</title>
         <style>
-          @page { size: A4; margin: 12mm; }
-          body { font-family: Arial, sans-serif; margin: 0; color: #111; }
-          .sheet { border: 1px solid #777; padding: 14px; min-height: 270mm; box-sizing: border-box; }
-          .top { display: grid; grid-template-columns: 1fr 270px; gap: 8px; }
-          .brand { border: 1px solid #888; padding: 8px; text-align: center; }
-          .brand-title { font-size: 28px; font-weight: 700; letter-spacing: 1px; }
-          .brand-sub { font-size: 24px; font-weight: 700; letter-spacing: 1px; margin-top: 2px; }
+          @page { size: A4; margin: 10mm; }
+          body { font-family: Arial, sans-serif; margin: 0; color: #000; }
+          .sheet { padding: 8px 10px 0; box-sizing: border-box; }
+          .page-head {
+            display: grid;
+            grid-template-columns: 1fr auto 1fr;
+            align-items: center;
+            font-size: 11px;
+            margin-bottom: 6px;
+          }
+          .page-head-title { text-align: center; }
+          .page-head-spacer { text-align: right; }
+          .rule { border-top: 1px solid #777; margin-bottom: 10px; }
+          .top {
+            display: grid;
+            grid-template-columns: 1fr 242px;
+            gap: 10px;
+            align-items: start;
+          }
+          .brand {
+            min-height: 76px;
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            padding: 8px 8px 8px 12px;
+          }
+          .brand-logo { width: 52px; height: 52px; object-fit: contain; }
+          .brand-title { font-size: 17px; font-weight: 700; letter-spacing: 0.8px; line-height: 1.05; }
+          .brand-sub { font-size: 16px; font-weight: 700; letter-spacing: 0.8px; margin-top: 2px; }
           .meta table, .main table, .items, .signatures table { width: 100%; border-collapse: collapse; }
           .meta td, .meta th, .main td, .main th, .items td, .items th, .signatures td {
-            border: 1px solid #888; padding: 6px 8px; font-size: 13px; vertical-align: top;
+            border: 1px solid #c7c7c7;
+            padding: 4px 7px;
+            font-size: 11px;
+            vertical-align: middle;
           }
-          .meta th, .main th, .items th { background: #f8f8f8; text-transform: uppercase; letter-spacing: .6px; font-size: 12px; }
-          .main { margin-top: 10px; }
-          .items { margin-top: 12px; table-layout: fixed; }
+          .meta th, .main th, .items th {
+            font-weight: 700;
+            text-transform: uppercase;
+            background: #fff;
+          }
+          .meta th { text-transform: none; font-size: 10px; text-align: left; }
+          .main { margin-top: 6px; }
+          .main th { width: 20%; font-size: 10px; }
+          .items {
+            margin-top: 10px;
+            table-layout: fixed;
+          }
           .items th:nth-child(1), .items td:nth-child(1) { width: 48%; }
-          .items th:nth-child(2), .items td:nth-child(2) { width: 20%; text-align: center; }
-          .items th:nth-child(3), .items td:nth-child(3) { width: 32%; }
-          .blank-row td { height: 26px; }
-          .signatures { margin-top: 34px; }
-          .line { border-bottom: 1px solid #111; margin-top: 24px; }
-          .sig-title { margin-top: 8px; font-size: 12px; font-style: italic; }
-          .note { margin-top: 42px; font-size: 13px; text-align: center; line-height: 1.5; }
-          .note a { color: #0b62c4; text-decoration: underline; }
-          .foot { margin-top: 46px; font-size: 13px; line-height: 1.5; }
+          .items th:nth-child(2), .items td:nth-child(2) { width: 18%; text-align: center; }
+          .items th:nth-child(3), .items td:nth-child(3) { width: 34%; }
+          .items td { height: 24px; vertical-align: top; }
+          .signatures { margin-top: 56px; }
+          .signatures td { width: 50%; padding: 8px 6px 6px; vertical-align: top; }
+          .sig-label {
+            display: flex;
+            align-items: center;
+            gap: 3px;
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+          }
+          .sig-box {
+            width: 12px;
+            height: 12px;
+            background: #000;
+            display: inline-block;
+          }
+          .sig-name {
+            margin-top: 12px;
+            text-align: center;
+            font-size: 11px;
+            min-height: 14px;
+          }
+          .line { border-bottom: 1px solid #000; margin-top: 2px; }
+          .sig-title { margin-top: 6px; font-size: 10px; font-style: italic; }
         </style>
       </head>
       <body>
         <div class="sheet">
+          <div class="page-head">
+            <div>${escapeHtml(printedAt)}</div>
+            <div class="page-head-title">MJSIR Acknowledgement</div>
+            <div class="page-head-spacer">&nbsp;</div>
+          </div>
+          <div class="rule"></div>
+
           <div class="top">
             <div class="brand">
-              <div class="brand-title">MJSIR</div>
-              <div class="brand-sub">ACKNOWLEDGEMENT</div>
+              <img class="brand-logo" src="${logoUrl}" alt="BSU logo" />
+              <div>
+                <div class="brand-title">MJSIR</div>
+                <div class="brand-sub">ACKNOWLEDGEMENT</div>
+              </div>
             </div>
             <div class="meta">
               <table>
@@ -697,10 +787,10 @@ const printRecord = (row) => {
 
           <div class="main">
             <table>
-              <tr><th style="width: 18%;">Date</th><td style="width: 32%;">${escapeHtml(formatDate(row.date_distributed))}</td><th style="width: 18%;">Time</th><td>${escapeHtml(formatTime(row.distributed_time))}</td></tr>
-              <tr><th>Name</th><td colspan="3">${escapeHtml(row.recipient_name || '')}</td></tr>
+              <tr><th style="width: 20%;">Date</th><td style="width: 31%;">${escapeHtml(formatDate(row.date_issued) === '-' ? '' : formatDate(row.date_issued))}</td><th style="width: 18%;">Time</th><td>${escapeHtml(formatTime(row.time_issued) === '-' ? '' : formatTime(row.time_issued))}</td></tr>
+              <tr><th>Name</th><td colspan="3">${escapeHtml(row.name || '')}</td></tr>
               <tr><th>Position</th><td colspan="3">${escapeHtml(row.position || '')}</td></tr>
-              <tr><th>Affiliation/Agency</th><td colspan="3">${escapeHtml(row.affiliation_agency || '')}</td></tr>
+              <tr><th>Affiliation/Agency</th><td colspan="3">${escapeHtml(row.affiliation || '')}</td></tr>
             </table>
           </div>
 
@@ -709,10 +799,10 @@ const printRecord = (row) => {
             ${printableItemRows
               .map(
                 (item) => `
-            <tr${item.volume || item.no_of_copies || item.remarks ? '' : ' class="blank-row"'}>
+            <tr${item.volume || item.copies || item.remark ? '' : ' class="blank-row"'}>
               <td>${escapeHtml(item.volume || '')}</td>
-              <td>${escapeHtml(item.no_of_copies ?? '')}</td>
-              <td>${escapeHtml(item.remarks || '')}</td>
+              <td>${escapeHtml(item.copies ?? '')}</td>
+              <td>${escapeHtml(item.remark || '')}</td>
             </tr>`
               )
               .join('')}
@@ -721,30 +811,20 @@ const printRecord = (row) => {
           <div class="signatures">
             <table>
               <tr>
-                <td style="width: 50%;">
-                  <div><strong>ISSUED BY:</strong> ${escapeHtml(row.issued_by || '')}</div>
+                <td>
+                  <div class="sig-label">ISSUED BY:<span class="sig-box"></span></div>
+                  <div class="sig-name">${escapeHtml(row.issued_by || '')}</div>
                   <div class="line"></div>
                   <div class="sig-title">Signature over printed name</div>
                 </td>
-                <td style="width: 50%;">
-                  <div><strong>RECEIVED BY:</strong> ${escapeHtml(row.received_by || '')}</div>
+                <td>
+                  <div class="sig-label">RECEIVED BY:<span class="sig-box"></span></div>
+                  <div class="sig-name">${escapeHtml(row.received_by || '')}</div>
                   <div class="line"></div>
                   <div class="sig-title">Signature over printed name</div>
                 </td>
               </tr>
             </table>
-          </div>
-
-          <div class="note">
-            Kindly return this acknowledgement receipt after signing. Kindly send back to<br/>
-            <a href="mailto:repo@bsu.edu.ph">repo@bsu.edu.ph</a> or (074) 422-1877.<br/>
-            Thank you very much!
-          </div>
-
-          <div class="foot">
-            Please accomplish this form in two copies:<br/>
-            1) REPO Copy<br/>
-            2) Receiving Copy
           </div>
         </div>
       </body>
@@ -759,13 +839,12 @@ const printRecord = (row) => {
 }
 
 const deleteRecord = async (row) => {
+  if (!isAuthenticated.value) return
   const confirmed = window.confirm('Delete this record? This action cannot be undone.')
   if (!confirmed) return
 
   try {
-    const itemRows = Array.isArray(row.itemRows) && row.itemRows.length ? row.itemRows : [row]
-    const ids = [...new Set(itemRows.map((item) => item.id).filter(Boolean))]
-    await Promise.all(ids.map((id) => axios.delete(`${apiBase}/mjsir-acknowledgements/${id}`)))
+    await axios.delete(`${apiBase}/acknowledgements/${row.id}`)
     pageMessage.value = 'Record deleted successfully.'
     pageError.value = ''
     await fetchRows()
@@ -778,8 +857,8 @@ const deleteRecord = async (row) => {
 const pad2 = (n) => String(n).padStart(2, '0')
 
 const displayDateTime = computed(() => {
-  if (!form.value.date_distributed || !form.value.distributed_time) return 'Click to select date and time'
-  return `${formatDate(form.value.date_distributed)} ${formatTime(form.value.distributed_time)}`
+  if (!form.value.date_issued || !form.value.time_issued) return 'Click to select date and time'
+  return `${formatDate(form.value.date_issued)} ${formatTime(form.value.time_issued)}`
 })
 
 const monthYearLabel = computed(() =>
@@ -808,8 +887,8 @@ const calendarCells = computed(() => {
 const isSelectedDay = (cell) => cell.currentMonth && cell.day === pickerDay.value
 
 const openDateTimePicker = () => {
-  if (form.value.date_distributed) {
-    const [y, m, d] = form.value.date_distributed.split('-').map(Number)
+  if (form.value.date_issued) {
+    const [y, m, d] = form.value.date_issued.split('-').map(Number)
     pickerYear.value = y
     pickerMonth.value = m - 1
     pickerDay.value = d
@@ -820,8 +899,8 @@ const openDateTimePicker = () => {
     pickerDay.value = now.getDate()
   }
 
-  if (form.value.distributed_time) {
-    const [h, m] = form.value.distributed_time.split(':').map(Number)
+  if (form.value.time_issued) {
+    const [h, m] = form.value.time_issued.split(':').map(Number)
     const isPm = h >= 12
     pickerMeridiem.value = isPm ? 'PM' : 'AM'
     const h12 = h % 12 === 0 ? 12 : h % 12
@@ -851,8 +930,8 @@ const selectDay = (cell) => {
 }
 
 const clearDateTime = () => {
-  form.value.date_distributed = ''
-  form.value.distributed_time = ''
+  form.value.date_issued = ''
+  form.value.time_issued = ''
   pickerOpen.value = false
 }
 
@@ -872,8 +951,8 @@ const applyDateTime = () => {
     ? (pickerHour.value % 12) + 12
     : (pickerHour.value % 12)
 
-  form.value.date_distributed = `${pickerYear.value}-${pad2(pickerMonth.value + 1)}-${pad2(pickerDay.value)}`
-  form.value.distributed_time = `${pad2(hour24)}:${pad2(pickerMinute.value)}`
+  form.value.date_issued = `${pickerYear.value}-${pad2(pickerMonth.value + 1)}-${pad2(pickerDay.value)}`
+  form.value.time_issued = `${pad2(hour24)}:${pad2(pickerMinute.value)}`
   pickerOpen.value = false
 }
 
@@ -881,11 +960,13 @@ const fetchRows = async () => {
   loading.value = true
   error.value = ''
   try {
-    const response = await axios.get(`${apiBase}/mjsir-acknowledgements`)
+    const response = await axios.get(`${apiBase}/acknowledgements`, {
+      params: { per_page: 200 }
+    })
     rows.value = response.data?.data || []
   } catch (err) {
     rows.value = []
-    error.value = err?.response?.data?.message || 'Failed to load MJSIR acknowledgement records.'
+    error.value = err?.response?.data?.message || 'Failed to load acknowledgement records.'
   } finally {
     loading.value = false
   }
@@ -893,55 +974,82 @@ const fetchRows = async () => {
 
 const resetForm = () => {
   form.value = {
-    date_distributed: '',
-    distributed_time: '',
-    recipient_name: '',
+    date_issued: '',
+    time_issued: '',
+    name: '',
     position: '',
-    affiliation_agency: '',
+    affiliation: '',
     issued_by: '',
     received_by: '',
-    volume: '',
-    no_of_copies: 1,
-    remarks: ''
+    items: [{ volume: '', copies: 1, remark: '' }]
   }
   pickerOpen.value = false
 }
 
 const createRow = async () => {
+  if (!isAuthenticated.value) return
   submitting.value = true
   submitError.value = ''
   submitMessage.value = ''
   pageError.value = ''
   pageMessage.value = ''
   try {
-    if (!form.value.date_distributed || !form.value.distributed_time) {
-      submitError.value = 'Please select both date and time.'
+    if (!form.value.date_issued) {
+      submitError.value = 'Please select a date.'
       return
     }
 
-    if (!form.value.volume || !form.value.no_of_copies) {
-      submitError.value = 'Volume and No. of Copies are required.'
+    const datePattern = /^\d{4}-\d{2}-\d{2}$/
+    if (!datePattern.test(form.value.date_issued)) {
+      submitError.value = 'Use date format YYYY-MM-DD.'
       return
     }
-    if (!form.value.remarks || !form.value.issued_by || !form.value.received_by) {
-      submitError.value = 'Remarks, Issued By, and Received By are required.'
+    const timePattern = /^\d{2}:\d{2}$/
+    if (form.value.time_issued && !timePattern.test(form.value.time_issued)) {
+      submitError.value = 'Use time format HH:MM.'
+      return
+    }
+
+    if (!form.value.name) {
+      submitError.value = 'Name is required.'
+      return
+    }
+
+    if (!form.value.items.length) {
+      submitError.value = 'Please add at least one item.'
+      return
+    }
+
+    for (let i = 0; i < form.value.items.length; i++) {
+      const item = form.value.items[i]
+      if (!item.volume || !item.copies) {
+        submitError.value = `Item ${i + 1}: Volume and copies are required.`
+        return
+      }
+    }
+
+    if (!form.value.issued_by || !form.value.received_by) {
+      submitError.value = 'Issued By and Received By are required.'
       return
     }
 
     const payload = {
-      date_distributed: form.value.date_distributed,
-      distributed_time: form.value.distributed_time || null,
-      recipient_name: form.value.recipient_name,
+      date_issued: form.value.date_issued,
+      time_issued: form.value.time_issued || null,
+      name: form.value.name,
       position: form.value.position,
-      affiliation_agency: form.value.affiliation_agency,
+      affiliation: form.value.affiliation,
       issued_by: form.value.issued_by || null,
       received_by: form.value.received_by || null,
-      volume: form.value.volume || null,
-      no_of_copies: form.value.no_of_copies || 1,
-      remarks: form.value.remarks || null
+      remarks: null,
+      items: form.value.items.map((item) => ({
+        volume: item.volume || null,
+        copies: item.copies || 1,
+        remark: item.remark || null
+      }))
     }
 
-    await axios.post(`${apiBase}/mjsir-acknowledgements`, payload)
+    await axios.post(`${apiBase}/acknowledgements`, payload)
     submitMessage.value = 'Record added successfully.'
     resetForm()
     showModal.value = false
@@ -954,41 +1062,40 @@ const createRow = async () => {
 }
 
 const openAddVolumeModal = (row) => {
+  if (!isAuthenticated.value) return
   pageError.value = ''
   pageMessage.value = ''
   submitError.value = ''
   submitMessage.value = ''
-  const itemRows = Array.isArray(row.itemRows) && row.itemRows.length ? row.itemRows : [row]
-  addVolumeSource.value = itemRows[0]
-  editSourceItemIds.value = itemRows.map((item) => item.id).filter(Boolean)
   editForm.value = {
-    date_distributed: row.date_distributed || '',
-    distributed_time: row.distributed_time || '',
-    recipient_name: row.recipient_name || '',
+    id: row.id,
+    date_issued: row.date_issued || '',
+    time_issued: row.time_issued || '',
+    name: row.name || '',
     position: row.position || '',
-    affiliation_agency: row.affiliation_agency || '',
+    affiliation: row.affiliation || '',
     issued_by: row.issued_by || '',
     received_by: row.received_by || '',
-    items: itemRows.map((item) => ({
-      id: item.id || null,
-      volume: item.volume || '',
-      no_of_copies: item.no_of_copies || 1,
-      remarks: item.remarks || ''
-    }))
+    remarks: row.remarks || '',
+    items: Array.isArray(row.items) && row.items.length
+      ? row.items.map((item) => ({
+          volume: item.volume || '',
+          copies: item.copies || 1,
+          remark: item.remark || ''
+        }))
+      : [{ volume: '', copies: 1, remark: '' }]
   }
   showAddVolumeModal.value = true
 }
 
 const closeAddVolumeModal = () => {
   showAddVolumeModal.value = false
-  addVolumeSource.value = null
-  editSourceItemIds.value = []
   submitError.value = ''
   submitMessage.value = ''
 }
 
 const addEditItem = () => {
-  editForm.value.items.push({ id: null, volume: '', no_of_copies: 1, remarks: '' })
+  editForm.value.items.push({ volume: '', copies: 1, remark: '' })
 }
 
 const removeEditItem = (index) => {
@@ -996,26 +1103,36 @@ const removeEditItem = (index) => {
   editForm.value.items.splice(index, 1)
 }
 
+const addFormItem = () => {
+  form.value.items.push({ volume: '', copies: 1, remark: '' })
+}
+
+const removeFormItem = (index) => {
+  if (form.value.items.length === 1) return
+  form.value.items.splice(index, 1)
+}
+
 const submitEditRecord = async () => {
+  if (!isAuthenticated.value) return
   submitError.value = ''
   submitMessage.value = ''
   pageError.value = ''
   pageMessage.value = ''
 
-  if (!addVolumeSource.value) {
-    submitError.value = 'No source row selected.'
+  if (!editForm.value.id) {
+    submitError.value = 'No record selected.'
     return
   }
 
-  if (!editForm.value.date_distributed || !editForm.value.distributed_time) {
-    submitError.value = 'Date and Time are required.'
-    return
-  }
+    if (!editForm.value.date_issued) {
+      submitError.value = 'Date is required.'
+      return
+    }
 
   for (let i = 0; i < editForm.value.items.length; i++) {
     const item = editForm.value.items[i]
-    if (!item.volume || !item.no_of_copies || !item.remarks) {
-      submitError.value = `Item ${i + 1}: Volume, No. of Copies, and Remark are required.`
+    if (!item.volume || !item.copies) {
+      submitError.value = `Item ${i + 1}: Volume and copies are required.`
       return
     }
   }
@@ -1024,59 +1141,25 @@ const submitEditRecord = async () => {
     return
   }
 
-  const base = {
-    date_distributed: editForm.value.date_distributed,
-    distributed_time: editForm.value.distributed_time || null,
-    recipient_name: editForm.value.recipient_name || null,
+  const payload = {
+    date_issued: editForm.value.date_issued,
+    time_issued: editForm.value.time_issued || null,
+    name: editForm.value.name || null,
     position: editForm.value.position || null,
-    affiliation_agency: editForm.value.affiliation_agency || null,
+    affiliation: editForm.value.affiliation || null,
     issued_by: editForm.value.issued_by || null,
-    received_by: editForm.value.received_by || null
+    received_by: editForm.value.received_by || null,
+    remarks: editForm.value.remarks || null,
+    items: editForm.value.items.map((item) => ({
+      volume: item.volume,
+      copies: item.copies,
+      remark: item.remark
+    }))
   }
-
-  const itemsWithIds = editForm.value.items.filter((item) => item.id)
-  const newItems = editForm.value.items.filter((item) => !item.id)
-  const activeIds = new Set(itemsWithIds.map((item) => item.id))
-  const removedIds = editSourceItemIds.value.filter((id) => !activeIds.has(id))
 
   try {
     submitting.value = true
-    if (removedIds.length) {
-      await Promise.all(removedIds.map((id) => axios.delete(`${apiBase}/mjsir-acknowledgements/${id}`)))
-    }
-
-    if (itemsWithIds.length) {
-      await Promise.all(
-        itemsWithIds.map((item) =>
-          axios.put(`${apiBase}/mjsir-acknowledgements/${item.id}`, {
-            ...base,
-            volume: item.volume,
-            no_of_copies: item.no_of_copies,
-            remarks: item.remarks || null
-          })
-        )
-      )
-    } else if (addVolumeSource.value?.id) {
-      await axios.put(`${apiBase}/mjsir-acknowledgements/${addVolumeSource.value.id}`, {
-        ...base,
-        volume: editForm.value.items[0].volume,
-        no_of_copies: editForm.value.items[0].no_of_copies,
-        remarks: editForm.value.items[0].remarks || null
-      })
-    }
-
-    if (newItems.length) {
-      await Promise.all(
-        newItems.map((item) =>
-          axios.post(`${apiBase}/mjsir-acknowledgements`, {
-            ...base,
-            volume: item.volume,
-            no_of_copies: item.no_of_copies,
-            remarks: item.remarks || null
-          })
-        )
-      )
-    }
+    await axios.put(`${apiBase}/acknowledgements/${editForm.value.id}`, payload)
     submitMessage.value = 'Record updated successfully.'
     closeAddVolumeModal()
     await fetchRows()
@@ -1096,6 +1179,7 @@ const closeModal = () => {
 }
 
 const openModal = () => {
+  if (!isAuthenticated.value) return
   pageError.value = ''
   pageMessage.value = ''
   submitError.value = ''
@@ -1127,8 +1211,9 @@ watch(showModal, async (isOpen) => {
   document.body.style.overflow = previousBodyOverflow || ''
 })
 
-onMounted(fetchRows)
-onMounted(() => {
+onMounted(async () => {
+  await checkAuth()
+  fetchRows()
   window.addEventListener('keydown', handleEscKey)
 })
 

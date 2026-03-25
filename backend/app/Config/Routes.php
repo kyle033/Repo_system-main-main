@@ -31,12 +31,6 @@ $routes->group('api', ['namespace' => 'App\Controllers\Api'], function($routes) 
     $routes->post('publications', 'PublicationsController::create');
     $routes->put('publications/(:num)', 'PublicationsController::update/$1');
     $routes->delete('publications/(:num)', 'PublicationsController::delete/$1');
-
-    // MJSIR Acknowledgements
-    $routes->get('mjsir-acknowledgements', 'MjsirAcknowledgementsController::index');
-    $routes->post('mjsir-acknowledgements', 'MjsirAcknowledgementsController::create');
-    $routes->put('mjsir-acknowledgements/(:num)', 'MjsirAcknowledgementsController::update/$1');
-    $routes->delete('mjsir-acknowledgements/(:num)', 'MjsirAcknowledgementsController::delete/$1');
     
     // Faculty
     $routes->get('faculty', 'FacultyController::index');
@@ -53,4 +47,21 @@ $routes->group('api', ['namespace' => 'App\Controllers\Api'], function($routes) 
 
     // Users
     $routes->post('users', 'UsersController::create');
+    $routes->get('users', 'UsersController::index');
+    $routes->put('users/(:num)', 'UsersController::update/$1');
+
+    // Acknowledgements
+    $routes->get('acknowledgements', 'AcknowledgementsController::index');
+    $routes->get('acknowledgements/(:num)', 'AcknowledgementsController::show/$1');
+    $routes->post('acknowledgements', 'AcknowledgementsController::create');
+    $routes->put('acknowledgements/(:num)', 'AcknowledgementsController::update/$1');
+    $routes->delete('acknowledgements/(:num)', 'AcknowledgementsController::delete/$1');
+
+    // Faculty Masterlist
+    $routes->get('faculty-masterlist', 'FacultyMasterlistController::index');
+    $routes->post('faculty-masterlist', 'FacultyMasterlistController::create');
+    $routes->put('faculty-masterlist/(:num)', 'FacultyMasterlistController::update/$1');
+    $routes->delete('faculty-masterlist/(:num)', 'FacultyMasterlistController::delete/$1');
+    $routes->post('faculty-masterlist/bulk-import', 'FacultyMasterlistController::bulkImport');
+    $routes->get('faculty-masterlist/export', 'FacultyMasterlistController::export');
 });
